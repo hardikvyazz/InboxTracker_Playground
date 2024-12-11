@@ -56,10 +56,21 @@ async function processReports(auth) {
         path: 'data/detailed_email_reports_abi.csv',
         header: [
             { id: 'Message_ID', title: 'Message ID' },
+            { id: 'Thread_ID', title: 'Thread ID' },
             { id: 'From', title: 'From' },
             { id: 'To', title: 'To' },
+            { id: 'CC', title: 'CC' },
+            { id: 'BCC', title: 'BCC' },
             { id: 'Subject', title: 'Subject' },
             { id: 'Date', title: 'Date' },
+            { id: 'Body_Text', title: 'Body (Text)' },
+            { id: 'Body_HTML', title: 'Body (HTML)' },
+            { id: 'Attachments', title: 'Attachments' },
+            { id: 'Labels', title: 'Labels' },
+            { id: 'SPF', title: 'SPF' },
+            { id: 'DKIM', title: 'DKIM' },
+            { id: 'DMARC', title: 'DMARC' },
+            { id: 'IP_Address', title: 'IP Address' },
         ],
         append: true,
     });
@@ -87,7 +98,8 @@ async function processReports(auth) {
             for (const message of messages) {
                 try {
                     const msg = await gmail.users.messages.get({ userId: 'me', id: message.id, format: 'full' });
-                    const headers = msg.data.payload.headers.reduce((acc, header) => {
+                    const payload = msg.data.payload;
+                    const headers = payload.headers.reduce((acc, header) => {
                         acc[header.name] = header.value;
                         return acc;
                     }, {});
@@ -99,13 +111,48 @@ async function processReports(auth) {
                         latestTimestamp = messageDate;
                     }
 
+                    // Parse body text, HTML, and attachments
+                    let bodyText = '';
+                    let bodyHtml = '';
+                    const attachments = [];
+                    const parts = payload.parts || [];
+
+                    for (const part of parts) {
+                        if (part.mimeType === 'text/plain' && part.body.data) {
+                            bodyText = Buffer.from(part.body.data, 'base64').toString('utf-8');
+                        } else if (part.mimeType === 'text/html' && part.body.data) {
+                            bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf-8');
+                        } else if (part.filename) {
+                            attachments.push(part.filename);
+                        }
+                    }
+
+                    const spf = headers['Received-SPF'] || 'N/A';
+                    const dkim = headers['Authentication-Results'] && headers['Authentication-Results'].includes('dkim=pass') ? 'Pass' : 'Fail';
+                    const dmarc = headers['Authentication-Results'] && headers['Authentication-Results'].includes('dmarc=pass') ? 'Pass' : 'Fail';
+
+                    const ipRegex = /(?:[0-9]{1,3}\.){3}[0-9]{1,3}/;
+                    const receivedHeader = headers['Received'] || '';
+                    const ipAddress = receivedHeader.match(ipRegex) ? receivedHeader.match(ipRegex)[0] : 'N/A';
+
                     await csvWriter.writeRecords([
                         {
                             Message_ID: message.id,
+                            Thread_ID: msg.data.threadId || 'N/A',
                             From: headers['From'] || 'N/A',
                             To: headers['To'] || 'N/A',
+                            CC: headers['Cc'] || 'N/A',
+                            BCC: headers['Bcc'] || 'N/A',
                             Subject: headers['Subject'] || 'N/A',
                             Date: headers['Date'] || 'N/A',
+                            Body_Text: bodyText,
+                            Body_HTML: bodyHtml,
+                            Attachments: attachments.join(', '),
+                            Labels: msg.data.labelIds ? msg.data.labelIds.join(', ') : 'N/A',
+                            SPF: spf,
+                            DKIM: dkim,
+                            DMARC: dmarc,
+                            IP_Address: ipAddress,
                         },
                     ]);
 
