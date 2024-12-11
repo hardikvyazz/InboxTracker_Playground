@@ -3,3 +3,5 @@ credentials.json
 data.csv
 token.json
 data
+last_processed.json
+lastread.js
