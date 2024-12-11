@@ -41,7 +41,7 @@ async function processReports(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
 
     // Define the CSV file path and header
-    const csvFilePath = 'detailed_email_reports_002.csv';
+    const csvFilePath = 'data/detailed_email_reports_alex.csv';
     const csvWriter = createCsvWriter({
         path: csvFilePath,
         header: [

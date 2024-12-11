@@ -2,5 +2,4 @@ node_modules
 credentials.json
 data.csv
 token.json
-detailed_email_reports.csv
-detailed_email_reports_002.csv
+data
