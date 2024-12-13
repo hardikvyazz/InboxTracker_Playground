@@ -6,8 +6,6 @@ const express = require('express');
 const app = express();
 const PORT = 3000;
 
-//Ajit is hero
-
 const CREDENTIALS_PATH = 'credentials.json';
 const LAST_PROCESSED_FILE = 'last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -55,7 +53,7 @@ async function processReports(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
 
     const csvWriter = createCsvWriter({
-        path: 'data/detailed_email_reports_dev001.csv',
+        path: 'data/detailed_email_reports.csv',
         header: [
             { id: 'Message_ID', title: 'Message ID' },
             { id: 'Thread_ID', title: 'Thread ID' },
