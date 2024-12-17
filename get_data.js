@@ -9,6 +9,7 @@ const PORT = 3000;
 const CREDENTIALS_PATH = 'credentials.json';
 const LAST_PROCESSED_FILE = 'last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const filePath =  'data/detailed_email_hardikdev.csv';
 
 function loadLastProcessedTimestamp() {
     if (fs.existsSync(LAST_PROCESSED_FILE)) {
@@ -53,7 +54,7 @@ async function processReports(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
 
     const csvWriter = createCsvWriter({
-        path: 'data/detailed_email_hardikdev.csv',
+        path: filePath,
         header: [
             { id: 'Message_ID', title: 'Message ID' },
             { id: 'Thread_ID', title: 'Thread ID' },
