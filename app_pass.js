@@ -13,7 +13,7 @@ const LAST_PROCESSED_FILE = 'last_processed.json';
 const filePath = 'data/detailed_email_hardikdev.csv';
 
 function loadLastProcessedTimestamp() {
-    if (fs.existsSync(LAST_PROCESSED_FILE)) {
+    if (fs.existsSync(LAST_PROCESSED_FILE)) { 
         const data = fs.readFileSync(LAST_PROCESSED_FILE, 'utf-8');
         return JSON.parse(data).lastProcessed || null;
     }
@@ -29,22 +29,49 @@ const csvWriter = createCsvWriter({
     path: filePath,
     header: [
         { id: 'Message_ID', title: 'Message ID' },
+        { id: 'Thread_ID', title: 'Thread ID' },
         { id: 'From', title: 'From' },
         { id: 'To', title: 'To' },
+        { id: 'Cc', title: 'Cc' },
+        { id: 'Bcc', title: 'Bcc' },
         { id: 'Subject', title: 'Subject' },
         { id: 'Date', title: 'Date' },
+        { id: 'Attachments', title: 'Attachments' },
+        { id: 'Labels', title: 'Labels' },
+        { id: 'SPF', title: 'SPF' },
+        { id: 'DKIM', title: 'DKIM' },
+        { id: 'DMARC', title: 'DMARC' },
+        { id: 'IP_Address', title: 'IP Address' },
     ],
     append: true,
 });
 
 function processMessage(message) {
     const headers = message.headers;
+    const attachments = message.attachments ? message.attachments.join(', ') : 'None';
+    const labels = message.labels ? message.labels.join(', ') : 'None';
+
+    // Placeholder for email authentication checks
+    const spf = 'Pass'; // Example value
+    const dkim = 'Pass'; // Example value
+    const dmarc = 'Pass'; // Example value
+    const ipAddress = '127.0.0.1'; // Replace with logic to extract IP
+
     return {
         Message_ID: headers['message-id'] || 'N/A',
+        Thread_ID: headers['x-thread-id'] || 'N/A',
         From: headers['from'] || 'N/A',
         To: headers['to'] || 'N/A',
+        Cc: headers['cc'] || 'N/A',
+        Bcc: headers['bcc'] || 'N/A',
         Subject: headers['subject'] || 'N/A',
         Date: headers['date'] || 'N/A',
+        Attachments: attachments,
+        Labels: labels,
+        SPF: spf,
+        DKIM: dkim,
+        DMARC: dmarc,
+        IP_Address: ipAddress,
     };
 }
 
@@ -63,17 +90,31 @@ function fetchEmails(imap) {
 
             fetcher.on('message', (msg, seqno) => {
                 let headers = '';
+                const message = { attachments: [], labels: [] };
+
                 msg.on('body', (stream) => {
                     stream.on('data', (chunk) => {
                         headers += chunk.toString('utf8');
                     });
                 });
 
+                msg.once('attributes', (attrs) => {
+                    if (attrs.struct) {
+                        attrs.struct.forEach((part) => {
+                            if (part.disposition && part.disposition.type.toUpperCase() === 'ATTACHMENT') {
+                                message.attachments.push(part.disposition.params.filename);
+                            }
+                        });
+                    }
+                    if (attrs.flags) {
+                        message.labels = attrs.flags;
+                    }
+                });
+
                 msg.once('end', () => {
                     const parsedHeaders = Imap.parseHeader(headers);
-                    messages.push({
-                        headers: parsedHeaders,
-                    });
+                    message.headers = parsedHeaders;
+                    messages.push(message);
                 });
             });
 
