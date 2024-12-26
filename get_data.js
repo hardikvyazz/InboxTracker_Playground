@@ -9,7 +9,7 @@ const PORT = 3000;
 const CREDENTIALS_PATH = 'credentials.json';
 const LAST_PROCESSED_FILE = 'last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const filePath =  'data/detailed_email_demo.csv';
+const filePath =  'data/detailed_spam_abi.csv';
 
 function loadLastProcessedTimestamp() {
     if (fs.existsSync(LAST_PROCESSED_FILE)) {
@@ -79,7 +79,9 @@ async function processReports(auth) {
     const lastProcessed = loadLastProcessedTimestamp();
     console.log(`Last processed timestamp: ${lastProcessed}`);
 
-    const query = lastProcessed ? `after:${lastProcessed}` : '';
+    // const query = lastProcessed ? `after:${lastProcessed}` : '';
+    const query = lastProcessed ? `after:${lastProcessed} (in:inbox OR in:spam)` : '(in:inbox OR in:spam)';
+
     console.log(`Query: ${query}`);
 
     let pageToken = null;
