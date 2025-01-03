@@ -9,7 +9,7 @@ const PORT = 3000;
 const CREDENTIALS_PATH = 'credentials.json';
 const LAST_PROCESSED_FILE = 'last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const filePath =  'data/detailed_spam_abi.csv';
+const filePath =  'data/detailed_spam_test001.csv';
 
 function loadLastProcessedTimestamp() {
     if (fs.existsSync(LAST_PROCESSED_FILE)) {
