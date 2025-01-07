@@ -7,9 +7,13 @@ const app = express();
 const PORT = 3000;
 
 const CREDENTIALS_PATH = 'credentials.json';
+const TOKEN_PATH = 'token.json'; // File to store tokens
 const LAST_PROCESSED_FILE = 'last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const filePath =  'data/detailed_spam_test001.csv';
+const today = new Date();
+const todayDate = today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+const fileName = `email_data_${todayDate}.csv`;
+const filePath = `data/${fileName}`;
 
 function loadLastProcessedTimestamp() {
     if (fs.existsSync(LAST_PROCESSED_FILE)) {
@@ -29,20 +33,36 @@ async function authorize() {
     const { client_secret, client_id, redirect_uris } = JSON.parse(content).web;
     const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
+    // Check if token file exists and load tokens
+    if (fs.existsSync(TOKEN_PATH)) {
+        const token = fs.readFileSync(TOKEN_PATH, 'utf-8');
+        oAuth2Client.setCredentials(JSON.parse(token));
+        console.log('Reusing existing credentials.');
+        return oAuth2Client; // Reuse token
+    }
+
+    // Generate auth URL if no tokens are available
     const authUrl = oAuth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
     });
 
-    console.log('Authorize this app by visiting this url:', authUrl);
+    console.log('Authorize this app by visiting this URL:', authUrl);
 
     return new Promise((resolve, reject) => {
         app.get('/oauth2callback', (req, res) => {
             const code = req.query.code;
             oAuth2Client.getToken(code, (err, token) => {
-                if (err) return reject('Error retrieving access token');
+                if (err) {
+                    console.error('Error retrieving access token', err);
+                    return reject(err);
+                }
                 oAuth2Client.setCredentials(token);
-                fs.writeFileSync('token.json', JSON.stringify(token));
+
+                // Save tokens to a file
+                fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+                console.log('Token stored to', TOKEN_PATH);
+
                 res.send('Authentication successful! You can close this tab.');
                 resolve(oAuth2Client);
             });
@@ -64,9 +84,6 @@ async function processReports(auth) {
             { id: 'BCC', title: 'BCC' },
             { id: 'Subject', title: 'Subject' },
             { id: 'Date', title: 'Date' },
-            // { id: 'Body_Text', title: 'Body (Text)' },
-            // { id: 'Body_HTML', title: 'Body (HTML)' },
-            // { id: 'Attachments', title: 'Attachments' },
             { id: 'Labels', title: 'Labels' },
             { id: 'SPF', title: 'SPF' },
             { id: 'DKIM', title: 'DKIM' },
@@ -79,7 +96,6 @@ async function processReports(auth) {
     const lastProcessed = loadLastProcessedTimestamp();
     console.log(`Last processed timestamp: ${lastProcessed}`);
 
-    // const query = lastProcessed ? `after:${lastProcessed}` : '';
     const query = lastProcessed ? `after:${lastProcessed} (in:inbox OR in:spam)` : '(in:inbox OR in:spam)';
 
     console.log(`Query: ${query}`);
@@ -114,22 +130,6 @@ async function processReports(auth) {
                         latestTimestamp = messageDate;
                     }
 
-                    // Parse body text, HTML, and attachments
-                    let bodyText = '';
-                    let bodyHtml = '';
-                    const attachments = [];
-                    const parts = payload.parts || [];
-
-                    // for (const part of parts) {
-                    //     if (part.mimeType === 'text/plain' && part.body.data) {
-                    //         bodyText = Buffer.from(part.body.data, 'base64').toString('utf-8');
-                    //     } else if (part.mimeType === 'text/html' && part.body.data) {
-                    //         bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf-8');
-                    //     } else if (part.filename) {
-                    //         attachments.push(part.filename);
-                    //     }
-                    // }
-
                     const spf = headers['Received-SPF'] || 'N/A';
                     const dkim = headers['Authentication-Results'] && headers['Authentication-Results'].includes('dkim=pass') ? 'Pass' : 'Fail';
                     const dmarc = headers['Authentication-Results'] && headers['Authentication-Results'].includes('dmarc=pass') ? 'Pass' : 'Fail';
@@ -148,9 +148,6 @@ async function processReports(auth) {
                             BCC: headers['Bcc'] || 'N/A',
                             Subject: headers['Subject'] || 'N/A',
                             Date: headers['Date'] || 'N/A',
-                            // Body_Text: bodyText,
-                            // Body_HTML: bodyHtml,
-                            // Attachments: attachments.join(', '),
                             Labels: msg.data.labelIds ? msg.data.labelIds.join(', ') : 'N/A',
                             SPF: spf,
                             DKIM: dkim,
