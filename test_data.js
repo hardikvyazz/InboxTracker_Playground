@@ -1,52 +1,68 @@
-import fs from 'fs';
-import { google } from 'googleapis';
-import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
-import express from 'express';
+const fs = require('fs');
+const { google } = require('googleapis');
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+const express = require('express');
 
 const app = express();
 const PORT = 3000;
 
 const CREDENTIALS_PATH = 'credentials.json';
+const TOKEN_PATH = 'token.json'; // File to store tokens
 const LAST_PROCESSED_FILE = 'last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-const filePath = 'data/detailed_spam_test001.csv';
+const today = new Date();
+const todayDate = today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+const fileName = `email_data_${todayDate}.csv`;
+const filePath = `data/${fileName}`;
 
-interface LastProcessedData {
-    lastProcessed: number | null;
-}
-
-function loadLastProcessedTimestamp(): number | null {
+function loadLastProcessedTimestamp() {
     if (fs.existsSync(LAST_PROCESSED_FILE)) {
         const data = fs.readFileSync(LAST_PROCESSED_FILE, 'utf-8');
-        return (JSON.parse(data) as LastProcessedData).lastProcessed || null;
+        return JSON.parse(data).lastProcessed || null;
     }
     return null;
 }
 
-function saveLastProcessedTimestamp(timestamp: number): void {
-    const data: LastProcessedData = { lastProcessed: timestamp };
+function saveLastProcessedTimestamp(timestamp) {
+    const data = { lastProcessed: timestamp };
     fs.writeFileSync(LAST_PROCESSED_FILE, JSON.stringify(data));
 }
 
-async function authorize(): Promise<any> {
-    const content = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
+async function authorize() {
+    const content = fs.readFileSync(CREDENTIALS_PATH);
     const { client_secret, client_id, redirect_uris } = JSON.parse(content).web;
     const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
+    // Check if token file exists and load tokens
+    if (fs.existsSync(TOKEN_PATH)) {
+        const token = fs.readFileSync(TOKEN_PATH, 'utf-8');
+        oAuth2Client.setCredentials(JSON.parse(token));
+        console.log('Reusing existing credentials.');
+        return oAuth2Client; // Reuse token
+    }
+
+    // Generate auth URL if no tokens are available
     const authUrl = oAuth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
     });
 
-    console.log('Authorize this app by visiting this url:', authUrl);
+    console.log('Authorize this app by visiting this URL:', authUrl);
 
     return new Promise((resolve, reject) => {
         app.get('/oauth2callback', (req, res) => {
-            const code = req.query.code as string;
+            const code = req.query.code;
             oAuth2Client.getToken(code, (err, token) => {
-                if (err) return reject('Error retrieving access token');
-                oAuth2Client.setCredentials(token!);
-                fs.writeFileSync('token.json', JSON.stringify(token));
+                if (err) {
+                    console.error('Error retrieving access token', err);
+                    return reject(err);
+                }
+                oAuth2Client.setCredentials(token);
+
+                // Save tokens to a file
+                fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+                console.log('Token stored to', TOKEN_PATH);
+
                 res.send('Authentication successful! You can close this tab.');
                 resolve(oAuth2Client);
             });
@@ -54,7 +70,7 @@ async function authorize(): Promise<any> {
     });
 }
 
-async function processReports(auth: any): Promise<void> {
+async function processReports(auth) {
     const gmail = google.gmail({ version: 'v1', auth });
 
     const csvWriter = createCsvWriter({
@@ -84,13 +100,13 @@ async function processReports(auth: any): Promise<void> {
 
     console.log(`Query: ${query}`);
 
-    let pageToken: string | null = null;
+    let pageToken = null;
     let latestTimestamp = lastProcessed;
 
     do {
         const res = await gmail.users.messages.list({
             userId: 'me',
-            pageToken: pageToken || undefined,
+            pageToken: pageToken,
             maxResults: 100,
             q: query,
         });
@@ -102,10 +118,10 @@ async function processReports(auth: any): Promise<void> {
                 try {
                     const msg = await gmail.users.messages.get({ userId: 'me', id: message.id, format: 'full' });
                     const payload = msg.data.payload;
-                    const headers = payload?.headers?.reduce((acc: { [key: string]: string }, header) => {
+                    const headers = payload.headers.reduce((acc, header) => {
                         acc[header.name] = header.value;
                         return acc;
-                    }, {}) || {};
+                    }, {});
 
                     const dateHeader = headers['Date'];
                     const messageDate = new Date(dateHeader).getTime() / 1000;
@@ -120,7 +136,7 @@ async function processReports(auth: any): Promise<void> {
 
                     const ipRegex = /(?:[0-9]{1,3}\.){3}[0-9]{1,3}/;
                     const receivedHeader = headers['Received'] || '';
-                    const ipAddress = receivedHeader.match(ipRegex) ? receivedHeader.match(ipRegex)![0] : 'N/A';
+                    const ipAddress = receivedHeader.match(ipRegex) ? receivedHeader.match(ipRegex)[0] : 'N/A';
 
                     await csvWriter.writeRecords([
                         {
@@ -142,12 +158,12 @@ async function processReports(auth: any): Promise<void> {
 
                     console.log(`Processed and saved message ID: ${message.id}`);
                 } catch (error) {
-                    console.error(`Failed to process message ${message.id}:`, (error as Error).message);
+                    console.error(`Failed to process message ${message.id}:`, error.message);
                 }
             }
         }
 
-        pageToken = res.data.nextPageToken || null;
+        pageToken = res.data.nextPageToken;
     } while (pageToken);
 
     if (latestTimestamp) {
@@ -158,7 +174,7 @@ async function processReports(auth: any): Promise<void> {
     console.log('All messages processed and saved.');
 }
 
-async function main(): Promise<void> {
+async function main() {
     try {
         const auth = await authorize();
         await processReports(auth);
