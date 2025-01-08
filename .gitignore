@@ -6,4 +6,4 @@ data/*
 src/test_data.js
 !conf
 !data/demo_data.csv
-conf/credentials.json
+credentials.json
