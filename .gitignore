@@ -1,10 +1,7 @@
 node_modules
 credentials.json
-data.csv
 token.json
-data
 last_processed.json
-lastread.js
-Code_Comments.js
-gmail.conf
-cred_fbl-test.json
+data/*
+!data/
+src/test_data.js
