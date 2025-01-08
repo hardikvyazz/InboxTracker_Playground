@@ -1,7 +1,9 @@
 node_modules
-credentials.json
 token.json
 last_processed.json
 data/*
 !data/
 src/test_data.js
+!conf
+!data/demo_data.csv
+credentials.json
