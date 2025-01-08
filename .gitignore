@@ -4,3 +4,4 @@ token.json
 last_processed.json
 data/*
 !data/
+src/test_data.js
