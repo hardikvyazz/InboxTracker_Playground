@@ -6,7 +6,7 @@ const express = require('express');
 const app = express();
 const PORT = 3000;
 
-const CREDENTIALS_PATH = 'conf/credentials.json';
+const CREDENTIALS_PATH = 'credentials.json';
 const TOKEN_PATH = 'conf/token.json'; // File to store tokens
 const LAST_PROCESSED_FILE = 'conf/last_processed.json';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
