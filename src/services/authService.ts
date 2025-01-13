@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { CREDENTIALS_PATH, TOKEN_PATH, SCOPES } from '../src/conf/constants';
+import { CREDENTIALS_PATH, TOKEN_PATH, SCOPES } from '../conf/constants';
 import { loadJsonFile, saveJsonFile } from './fileReadandWrite';
 import express from 'express';
 
