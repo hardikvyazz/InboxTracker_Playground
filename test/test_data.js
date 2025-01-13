@@ -2,18 +2,19 @@ const fs = require('fs');
 const { google } = require('googleapis');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const express = require('express');
+const path=require('path');
 
 const app = express();
 const PORT = 3000;
 
-const CREDENTIALS_PATH = 'conf/credentials.json';
-const TOKEN_PATH = 'conf/token.json'; // File to store tokens
-const LAST_PROCESSED_FILE = 'conf/last_processed.json';
+const CREDENTIALS_PATH = path.join(__dirname, `../../credentials/gmail/credentials.json`);
+const TOKEN_PATH = path.join(__dirname, `../../credentials/gmail/token.json`);// File to store tokens
+const LAST_PROCESSED_FILE = path.join(__dirname, `../../credentials/gmail/last_processed.json`);
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 const today = new Date();
 const todayDate = today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
 const fileName = `email_data_${todayDate}.csv`;
-const filePath = `data/${fileName}`;
+const filePath = path.join(__dirname, `../../csv_data/${fileName}`);
 
 function loadLastProcessedTimestamp() {
     if (fs.existsSync(LAST_PROCESSED_FILE)) {

@@ -7,9 +7,9 @@ const path=require('path');
 const app = express();
 const PORT = 3000;
 
-const CREDENTIALS_PATH = path.join(__dirname, `credentials.json`);
-const TOKEN_PATH = path.join(__dirname, `conf/token.json`);// File to store tokens
-const LAST_PROCESSED_FILE = path.join(__dirname, `conf/token.json`);
+const CREDENTIALS_PATH = path.join(__dirname, `../../credentials/gmail/credentials.json`);
+const TOKEN_PATH = path.join(__dirname, `../../credentials/gmail/token.json`);// File to store tokens
+const LAST_PROCESSED_FILE = path.join(__dirname, `../../credentials/gmail/last_processed.json`);
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 const today = new Date();
 const todayDate = today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
