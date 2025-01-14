@@ -1,11 +1,11 @@
 import { google } from 'googleapis';
 import { LAST_PROCESSED_FILE } from '../conf/constants';
 import { loadJsonFile, saveJsonFile } from '../services/fileReadandWrite';
-import createCsvWriter = require('csv-writer').createObjectCsvWriter;
+import {createObjectCsvWriter} from 'csv-writer';
 
 export async function processReports(auth: any): Promise<void> {
   const gmail = google.gmail({ version: 'v1', auth });
-  const csvWriter = createCsvWriter.createObjectCsvWriter({
+  const csvWriter = createObjectCsvWriter({
     path: 'data/email_data.csv',
     header: [
         { id: 'Message_ID', title: 'Message ID' },
