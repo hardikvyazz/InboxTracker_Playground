@@ -20,10 +20,12 @@ const app = (0, express_1.default)();
 app.listen(constants_1.PORT, () => __awaiter(void 0, void 0, void 0, function* () {
     console.log(`Server running on http://localhost:${constants_1.PORT}`);
     try {
-        const auth = yield (0, authService_1.authorize)();
+        const auth = yield (0, authService_1.authorize)(app); // Pass the app instance
+        console.log('Authorized successfully.');
+        console.log(auth);
         yield (0, emailProcessor_1.processReports)(auth);
     }
     catch (error) {
-        console.error('Error:', error);
+        console.error('Authorization Failed:', error);
     }
 }));

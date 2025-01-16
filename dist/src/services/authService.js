@@ -8,17 +8,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authorize = authorize;
 const googleapis_1 = require("googleapis");
 const constants_1 = require("../conf/constants");
 const fileReadandWrite_1 = require("./fileReadandWrite");
-const express_1 = __importDefault(require("express"));
-const app = (0, express_1.default)();
-function authorize() {
+function authorize(app) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('Authorizing...');
         const credentials = (0, fileReadandWrite_1.loadJsonFile)(constants_1.CREDENTIALS_PATH);
@@ -35,13 +30,16 @@ function authorize() {
         const authUrl = oAuth2Client.generateAuthUrl({ access_type: 'offline', scope: constants_1.SCOPES });
         console.log('Authorize this app by visiting:', authUrl);
         return new Promise((resolve, reject) => {
+            // Attach the route to handle the OAuth2 callback
             app.get('/oauth2callback', (req, res) => {
                 console.log('OAuth2 callback route hit');
                 console.log('Query parameters:', req.query);
                 const code = req.query.code;
                 oAuth2Client.getToken(code, (err, token) => {
-                    if (err)
+                    if (err) {
+                        console.error('Error retrieving token:', err);
                         return reject(err);
+                    }
                     oAuth2Client.setCredentials(token);
                     (0, fileReadandWrite_1.saveJsonFile)(constants_1.TOKEN_PATH, token);
                     res.send('Authentication successful! You can close this tab.');

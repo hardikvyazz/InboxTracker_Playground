@@ -8,18 +8,26 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processReports = processReports;
 const googleapis_1 = require("googleapis");
+const path_1 = __importDefault(require("path"));
 const constants_1 = require("../conf/constants");
 const fileReadandWrite_1 = require("../services/fileReadandWrite");
 const csv_writer_1 = require("csv-writer");
+const today = new Date();
+const todayDate = today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+const fileName = `email_data_${todayDate}.csv`;
+const filePath = path_1.default.join(__dirname, `../../../../csv_data/${fileName}`);
 function processReports(auth) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c, _d;
         const gmail = googleapis_1.google.gmail({ version: 'v1', auth });
         const csvWriter = (0, csv_writer_1.createObjectCsvWriter)({
-            path: 'data/email_data.csv',
+            path: filePath,
             header: [
                 { id: 'Message_ID', title: 'Message ID' },
                 { id: 'Thread_ID', title: 'Thread ID' },
