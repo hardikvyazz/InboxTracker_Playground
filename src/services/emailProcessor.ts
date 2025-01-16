@@ -1,12 +1,17 @@
 import { google, gmail_v1 } from 'googleapis';
+import path from 'path';
 import { LAST_PROCESSED_FILE } from '../conf/constants';
 import { loadJsonFile, saveJsonFile } from '../services/fileReadandWrite';
-import { createObjectCsvWriter } from 'csv-writer';
+import { createObjectCsvWriter } from 'csv-writer';const today = new Date();
+const todayDate = today.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+const fileName = `email_data_${todayDate}.csv`;
+const filePath = path.join(__dirname, `../../../../csv_data${fileName}`);
+
 
 export async function processReports(auth: any): Promise<void> {
   const gmail = google.gmail({ version: 'v1', auth });
   const csvWriter = createObjectCsvWriter({
-    path: 'data/email_data.csv',
+    path: filePath,
     header: [
       { id: 'Message_ID', title: 'Message ID' },
       { id: 'Thread_ID', title: 'Thread ID' },
