@@ -8,3 +8,4 @@ src/test_data.js
 !data/demo_data.csv
 credentials.json
 test/*
+dist/*
