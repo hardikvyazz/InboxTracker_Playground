@@ -11,7 +11,6 @@ app.listen(PORT, async () => {
   try {
     const auth = await authorize(app); // Pass the app instance
     console.log('Authorized successfully.');
-    console.log(auth);
     
     await processReports(auth);
   } catch (error) {

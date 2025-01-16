@@ -25,7 +25,7 @@ export async function authorize(app: express.Application): Promise<any> {
     // Attach the route to handle the OAuth2 callback
     app.get('/oauth2callback', (req, res) => {
       console.log('OAuth2 callback route hit');
-      console.log('Query parameters:', req.query);
+    //   console.log('Query parameters:', req.query);
       const code = req.query.code as string;
       oAuth2Client.getToken(code, (err, token) => {
         if (err) {
