@@ -20,6 +20,7 @@ const express_1 = __importDefault(require("express"));
 const app = (0, express_1.default)();
 function authorize() {
     return __awaiter(this, void 0, void 0, function* () {
+        console.log('Authorizing...');
         const credentials = (0, fileReadandWrite_1.loadJsonFile)(constants_1.CREDENTIALS_PATH);
         if (!credentials)
             throw new Error('Credentials file not found.');
