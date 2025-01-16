@@ -31,7 +31,8 @@ export async function processReports(auth: any): Promise<void> {
   const lastProcessed =
     loadJsonFile<{ lastProcessed: number }>(LAST_PROCESSED_FILE)?.lastProcessed || 0;
 
-  const query = lastProcessed ? `after:${lastProcessed}` : '';
+  // const query = lastProcessed ? `after:${lastProcessed}` : '';
+  const query : string= lastProcessed ? `after:${lastProcessed} (in:inbox OR in:spam)` : '(in:inbox OR in:spam)';
   const res = await gmail.users.messages.list({ userId: 'me', q: query });
   const messages = res.data.messages || [];
 
