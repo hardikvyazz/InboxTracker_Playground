@@ -1,10 +1,9 @@
 import { google, gmail_v1 } from 'googleapis';
 import { LAST_PROCESSED_FILE } from '../conf/constants';
 import { loadJsonFile, saveJsonFile } from '../services/fileReadandWrite';
-import { createObjectCsvWriter } from 'csv-writer';const today = new Date();
+import { createObjectCsvWriter } from 'csv-writer'; 
+const today = new Date();
 import { outputFilePath } from '../conf/constants';
-
-
 
 export async function processReports(auth: any): Promise<void> {
   const gmail = google.gmail({ version: 'v1', auth });
@@ -28,16 +27,25 @@ export async function processReports(auth: any): Promise<void> {
     append: true,
   });
 
-  const lastProcessed =
-    loadJsonFile<{ lastProcessed: number }>(LAST_PROCESSED_FILE)?.lastProcessed || 0;
-
-    const query : string= lastProcessed ? `after:${lastProcessed} (in:inbox OR in:spam)` : '(in:inbox OR in:spam)';
+  const lastProcessedData = loadJsonFile<{ lastProcessed: number }>(LAST_PROCESSED_FILE);
+  const lastProcessed = lastProcessedData?.lastProcessed || 0;
+  
+  const query = lastProcessed
+    ? `after:${Math.floor(lastProcessed / 1000)} (in:inbox OR in:spam)`
+    : '(in:inbox OR in:spam)'; // Convert milliseconds to seconds for Gmail API
+  
+  console.log('Using query:', query);
+  
   const res = await gmail.users.messages.list({ userId: 'me', q: query });
+  if (!res.data.messages || res.data.messages.length === 0) {
+    console.log('No new messages found.');
+    return; // Exit if no messages are found
+  }
+
   const messages = res.data.messages || [];
-
-  let latestTimestamp = lastProcessed ;
-
-let mailArray = [];
+  let latestTimestamp = lastProcessed;
+  let newMessagesProcessed = false;
+  let mailArray = [];
 
   for (const message of messages) {
     try {
@@ -48,27 +56,26 @@ let mailArray = [];
       });
       const payload = msg.data.payload;
       const headers = parseHeaders(payload?.headers || []);
-
       const dateHeader = headers['Date'] || '';
       const messageDate = new Date(dateHeader).getTime();
 
-      latestTimestamp = Math.max(latestTimestamp, messageDate);
+      if (messageDate > lastProcessed) {
+        newMessagesProcessed = true; // Mark that a new email was processed
+        latestTimestamp = Math.max(latestTimestamp, messageDate);
+      }
 
-      mailArray.unshift({
-        msg,
-        headers,
-        message
-      })
-
+      mailArray.unshift({ msg, headers, message });
     } catch (error: any) {
       console.error(`Failed to process message ${message.id}:`, error.message);
     }
   }
 
-  for(let i = 0; i < mailArray.length; i++){
-    let {message, headers, msg} = mailArray[i];
-    console.log('Processing message:', message, msg, headers);
-          await csvWriter.writeRecords([
+  // Only write to CSV if there are new emails to process
+  if (newMessagesProcessed) {
+    for (let i = 0; i < mailArray.length; i++) {
+      const { message, headers, msg } = mailArray[i];
+      console.log('Processing message:', message, msg, headers);
+      await csvWriter.writeRecords([
         {
           Message_ID: message.id || 'N/A',
           Thread_ID: msg.data.threadId || 'N/A',
@@ -89,17 +96,19 @@ let mailArray = [];
           IP_Address: extractIpAddress(headers['Received'] || ''),
         },
       ]);
-    
-  }
+    }
 
-  if (latestTimestamp > lastProcessed) {
-    saveJsonFile(LAST_PROCESSED_FILE, { lastProcessed: latestTimestamp });
+    // Update lastProcessed only if new messages were processed
+    if (latestTimestamp > lastProcessed) {
+      saveJsonFile(LAST_PROCESSED_FILE, { lastProcessed: latestTimestamp });
+      console.log(`Updated lastProcessed to: ${new Date(latestTimestamp).toISOString()}`);
+    }
+  } else {
+    console.log('No new messages were processed.');
   }
 }
 
-function parseHeaders(
-  headers: gmail_v1.Schema$MessagePartHeader[] = []
-): Record<string, string> {
+function parseHeaders(headers: gmail_v1.Schema$MessagePartHeader[] = []): Record<string, string> {
   return headers.reduce((acc, header) => {
     if (header.name && header.value) {
       acc[header.name] = header.value;
