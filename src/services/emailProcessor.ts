@@ -31,12 +31,13 @@ export async function processReports(auth: any): Promise<void> {
   const lastProcessed =
     loadJsonFile<{ lastProcessed: number }>(LAST_PROCESSED_FILE)?.lastProcessed || 0;
 
-  // const query = lastProcessed ? `after:${lastProcessed}` : '';
-  const query : string= lastProcessed ? `after:${lastProcessed} (in:inbox OR in:spam)` : '(in:inbox OR in:spam)';
+    const query : string= lastProcessed ? `after:${lastProcessed} (in:inbox OR in:spam)` : '(in:inbox OR in:spam)';
   const res = await gmail.users.messages.list({ userId: 'me', q: query });
   const messages = res.data.messages || [];
 
   let latestTimestamp = lastProcessed ;
+
+let mailArray = [];
 
   for (const message of messages) {
     try {
@@ -53,7 +54,21 @@ export async function processReports(auth: any): Promise<void> {
 
       latestTimestamp = Math.max(latestTimestamp, messageDate);
 
-      await csvWriter.writeRecords([
+      mailArray.unshift({
+        msg,
+        headers,
+        message
+      })
+
+    } catch (error: any) {
+      console.error(`Failed to process message ${message.id}:`, error.message);
+    }
+  }
+
+  for(let i = 0; i < mailArray.length; i++){
+    let {message, headers, msg} = mailArray[i];
+    console.log('Processing message:', message, msg, headers);
+          await csvWriter.writeRecords([
         {
           Message_ID: message.id || 'N/A',
           Thread_ID: msg.data.threadId || 'N/A',
@@ -74,9 +89,7 @@ export async function processReports(auth: any): Promise<void> {
           IP_Address: extractIpAddress(headers['Received'] || ''),
         },
       ]);
-    } catch (error: any) {
-      console.error(`Failed to process message ${message.id}:`, error.message);
-    }
+    
   }
 
   if (latestTimestamp > lastProcessed) {
