@@ -14,8 +14,17 @@ export async function authorize(app: express.Application): Promise<any> {
   const token = loadJsonFile(TOKEN_PATH);
   if (token) {
     oAuth2Client.setCredentials(token);
-    console.log('Reusing existing credentials.');
-    return oAuth2Client;
+
+    try {
+      await oAuth2Client.getAccessToken();
+      console.log('Using existing tokens.');
+      return oAuth2Client;
+  } catch (err) {
+      console.error('Error with existing token:', err);
+  }
+  
+    // console.log('Reusing existing credentials.');
+    // return oAuth2Client;
   }
 
   const authUrl = oAuth2Client.generateAuthUrl({ access_type: 'offline', scope: SCOPES });
