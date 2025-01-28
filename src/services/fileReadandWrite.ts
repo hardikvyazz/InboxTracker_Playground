@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 
 export function loadJsonFile<T>(filePath: string): T | null {
   console.log('Attempting to load JSON file from:', filePath);
@@ -30,6 +31,14 @@ export function saveJsonFile<T>(filePath: string, data: T): void {
   console.log('Saving JSON data to:', filePath);
 
   try {
+    // Ensure the directory exists
+    const directoryPath = path.dirname(filePath);
+    if (!fs.existsSync(directoryPath)) {
+      fs.mkdirSync(directoryPath, { recursive: true });
+      console.log('Directory created:', directoryPath);
+    }
+
+    // Save the file
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
     console.log('File saved successfully.');
   } catch (error) {
