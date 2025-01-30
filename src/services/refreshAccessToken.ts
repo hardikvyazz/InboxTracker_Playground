@@ -1,5 +1,5 @@
 import { TOKEN_PATH } from "../conf/constants";
-import { saveJsonFile } from "./fileReadandWrite";
+import { saveJsonFile } from "../untils/fileReadandWrite";
 
 export async function refreshAccessToken(oAuth2Client: any) {
     return new Promise((resolve, reject) => {
