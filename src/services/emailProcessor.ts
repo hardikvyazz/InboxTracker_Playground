@@ -1,12 +1,11 @@
 import { google, gmail_v1 } from 'googleapis';
 import { LAST_PROCESSED_FILE } from '../conf/constants';
-import { loadJsonFile, saveJsonFile } from '../services/fileReadandWrite';
-import { createObjectCsvWriter } from 'csv-writer'; 
+import { loadJsonFile, saveJsonFile } from '../untils/fileReadandWrite';
+import { createObjectCsvWriter } from 'csv-writer';
 const today = new Date();
 import { outputFilePath } from '../conf/constants';
 
-export async function processReports(auth: any): Promise<void> {
-  const gmail = google.gmail({ version: 'v1', auth });
+export async function processReports(authClients: any[]): Promise<void> {
   const csvWriter = createObjectCsvWriter({
     path: outputFilePath,
     header: [
@@ -35,38 +34,44 @@ export async function processReports(auth: any): Promise<void> {
     : '(in:inbox OR in:spam)'; // Convert milliseconds to seconds for Gmail API
   
   console.log('Using query:', query);
-  
-  const res = await gmail.users.messages.list({ userId: 'me', q: query });
-  if (!res.data.messages || res.data.messages.length === 0) {
-    console.log('No new messages found.');
-    return; // Exit if no messages are found
-  }
 
-  const messages = res.data.messages || [];
-  let latestTimestamp = lastProcessed;
   let newMessagesProcessed = false;
+  let latestTimestamp = lastProcessed;
   let mailArray = [];
 
-  for (const message of messages) {
-    try {
-      const msg = await gmail.users.messages.get({
-        userId: 'me',
-        id: message.id || '',
-        format: 'full',
-      });
-      const payload = msg.data.payload;
-      const headers = parseHeaders(payload?.headers || []);
-      const dateHeader = headers['Date'] || '';
-      const messageDate = new Date(dateHeader).getTime();
+  for (const auth of authClients) {
+    const gmail = google.gmail({ version: 'v1', auth });
+    
+    // Fetch messages for each client
+    const res = await gmail.users.messages.list({ userId: 'me', q: query });
+    if (!res.data.messages || res.data.messages.length === 0) {
+      console.log('No new messages found.');
+      continue; // Skip to the next client if no messages are found
+    }
 
-      if (messageDate > lastProcessed) {
-        newMessagesProcessed = true; // Mark that a new email was processed
-        latestTimestamp = Math.max(latestTimestamp, messageDate);
+    const messages = res.data.messages || [];
+
+    for (const message of messages) {
+      try {
+        const msg = await gmail.users.messages.get({
+          userId: 'me',
+          id: message.id || '',
+          format: 'full',
+        });
+        const payload = msg.data.payload;
+        const headers = parseHeaders(payload?.headers || []);
+        const dateHeader = headers['Date'] || '';
+        const messageDate = new Date(dateHeader).getTime();
+
+        if (messageDate > lastProcessed) {
+          newMessagesProcessed = true; // Mark that a new email was processed
+          latestTimestamp = Math.max(latestTimestamp, messageDate);
+        }
+
+        mailArray.unshift({ msg, headers, message });
+      } catch (error: any) {
+        console.error(`Failed to process message ${message.id}:`, error.message);
       }
-
-      mailArray.unshift({ msg, headers, message });
-    } catch (error: any) {
-      console.error(`Failed to process message ${message.id}:`, error.message);
     }
   }
 
