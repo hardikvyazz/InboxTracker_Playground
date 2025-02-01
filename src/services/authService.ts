@@ -73,7 +73,8 @@
 //               console.error('Error retrieving email:', err);
 //               return reject(err);
 //             }
-
+//             console.log('Email retrieved:', response?.data?.emailAddresses?.[0]?.value);
+            
 //             const email = response?.data?.emailAddresses?.[0]?.value;
 //             if (!email) {
 //               console.error('No email found.');
