@@ -1,9 +1,7 @@
 import { google, gmail_v1 } from 'googleapis';
-import { LAST_PROCESSED_FILE } from '../conf/constants';
+import { LAST_PROCESSED_FILE, outputFilePath } from '../conf/constants';
 import { loadJsonFile, saveJsonFile } from '../untils/fileReadandWrite';
 import { createObjectCsvWriter } from 'csv-writer';
-const today = new Date();
-import { outputFilePath } from '../conf/constants';
 
 export async function processReports(authClients: any[]): Promise<void> {
   const csvWriter = createObjectCsvWriter({
@@ -29,27 +27,42 @@ export async function processReports(authClients: any[]): Promise<void> {
   const lastProcessedData = loadJsonFile<{ lastProcessed: number }>(LAST_PROCESSED_FILE);
   const lastProcessed = lastProcessedData?.lastProcessed || 0;
   
+  // Ensure we fetch all emails, including Inbox and Spam
   const query = lastProcessed
     ? `after:${Math.floor(lastProcessed / 1000)} (in:inbox OR in:spam)`
-    : '(in:inbox OR in:spam)'; // Convert milliseconds to seconds for Gmail API
-  
+    : 'in:inbox OR in:spam';
+
   console.log('Using query:', query);
 
   let newMessagesProcessed = false;
   let latestTimestamp = lastProcessed;
-  let mailArray = [];
+  let mailArray: { message: gmail_v1.Schema$Message; headers: Record<string, string>; msg: any }[] = [];
 
   for (const auth of authClients) {
     const gmail = google.gmail({ version: 'v1', auth });
-    
-    // Fetch messages for each client
-    const res = await gmail.users.messages.list({ userId: 'me', q: query });
-    if (!res.data.messages || res.data.messages.length === 0) {
-      console.log('No new messages found.');
-      continue; // Skip to the next client if no messages are found
-    }
 
-    const messages = res.data.messages || [];
+    let nextPageToken: string | undefined = undefined;
+    let messages: gmail_v1.Schema$Message[] = [];
+
+    // Fetch all messages with pagination
+    do {
+      const res: any = await gmail.users.messages.list({
+        userId: 'me',
+        q: query, // Ensures Inbox & Spam emails are included
+        maxResults: 500, // Fetch up to 500 per request
+        pageToken: nextPageToken,
+      });
+
+      if (res.data.messages) {
+        messages.push(...res.data.messages);
+      }
+      nextPageToken = res.data.nextPageToken; // Continue fetching next page
+    } while (nextPageToken);
+
+    if (messages.length === 0) {
+      console.log('No new messages found.');
+      continue;
+    }
 
     for (const message of messages) {
       try {
@@ -58,27 +71,27 @@ export async function processReports(authClients: any[]): Promise<void> {
           id: message.id || '',
           format: 'full',
         });
+
         const payload = msg.data.payload;
         const headers = parseHeaders(payload?.headers || []);
         const dateHeader = headers['Date'] || '';
         const messageDate = new Date(dateHeader).getTime();
 
         if (messageDate > lastProcessed) {
-          newMessagesProcessed = true; // Mark that a new email was processed
+          newMessagesProcessed = true;
           latestTimestamp = Math.max(latestTimestamp, messageDate);
         }
 
-        mailArray.unshift({ msg, headers, message });
+        mailArray.unshift({ message, headers, msg });
       } catch (error: any) {
         console.error(`Failed to process message ${message.id}:`, error.message);
       }
     }
   }
 
-  // Only write to CSV if there are new emails to process
+  // Write to CSV if new emails were processed
   if (newMessagesProcessed) {
-    for (let i = 0; i < mailArray.length; i++) {
-      const { message, headers, msg } = mailArray[i];
+    for (const { message, headers, msg } of mailArray) {
       console.log('Processing message:', message, msg, headers);
       await csvWriter.writeRecords([
         {
@@ -92,18 +105,14 @@ export async function processReports(authClients: any[]): Promise<void> {
           Date: headers['Date'] || 'N/A',
           Labels: msg.data.labelIds?.join(', ') || 'N/A',
           SPF: headers['Received-SPF'] || 'N/A',
-          DKIM: headers['Authentication-Results']?.includes('dkim=pass')
-            ? 'Pass'
-            : 'Fail',
-          DMARC: headers['Authentication-Results']?.includes('dmarc=pass')
-            ? 'Pass'
-            : 'Fail',
+          DKIM: headers['Authentication-Results']?.includes('dkim=pass') ? 'Pass' : 'Fail',
+          DMARC: headers['Authentication-Results']?.includes('dmarc=pass') ? 'Pass' : 'Fail',
           IP_Address: extractIpAddress(headers['Received'] || ''),
         },
       ]);
     }
 
-    // Update lastProcessed only if new messages were processed
+    // Save last processed timestamp
     if (latestTimestamp > lastProcessed) {
       saveJsonFile(LAST_PROCESSED_FILE, { lastProcessed: latestTimestamp });
       console.log(`Updated lastProcessed to: ${new Date(latestTimestamp).toISOString()}`);
@@ -113,6 +122,7 @@ export async function processReports(authClients: any[]): Promise<void> {
   }
 }
 
+// Utility function to parse headers into a dictionary
 function parseHeaders(headers: gmail_v1.Schema$MessagePartHeader[] = []): Record<string, string> {
   return headers.reduce((acc, header) => {
     if (header.name && header.value) {
@@ -122,6 +132,7 @@ function parseHeaders(headers: gmail_v1.Schema$MessagePartHeader[] = []): Record
   }, {} as Record<string, string>);
 }
 
+// Extract IP address from 'Received' headers
 function extractIpAddress(receivedHeader: string): string {
   const ipRegex = /(?:\d{1,3}\.){3}\d{1,3}/;
   const match = receivedHeader.match(ipRegex);
